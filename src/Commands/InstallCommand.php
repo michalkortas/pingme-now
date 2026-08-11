@@ -3,6 +3,7 @@
 namespace MichalKortas\PingMeNow\Commands;
 
 use Illuminate\Console\Command;
+use MichalKortas\PingMeNow\Support\EnvironmentFile;
 use MichalKortas\PingMeNow\Transport\HubClient;
 use Throwable;
 
@@ -12,7 +13,7 @@ class InstallCommand extends Command
 
     protected $description = 'Configure the PingMe hub connection';
 
-    public function handle(HubClient $client): int
+    public function handle(HubClient $client, EnvironmentFile $environment): int
     {
         $url = rtrim((string) ($this->option('url') ?: $this->ask('Adres Huba')), '/');
         $token = (string) ($this->option('token') ?: $this->secret('Token integracyjny'));
@@ -23,9 +24,9 @@ class InstallCommand extends Command
             return self::FAILURE;
         }
 
-        $this->writeEnvironment('PINGME_ENABLED', 'true');
-        $this->writeEnvironment('PINGME_URL', $url);
-        $this->writeEnvironment('PINGME_TOKEN', $token);
+        $environment->write('PINGME_ENABLED', 'true');
+        $environment->write('PINGME_URL', $url);
+        $environment->write('PINGME_TOKEN', $token);
 
         if ($this->laravel->configurationIsCached()) {
             $this->callSilent('config:clear');
@@ -45,20 +46,5 @@ class InstallCommand extends Command
         $this->info('Połączono z aplikacją: '.data_get($response, 'application.name'));
 
         return $this->call('pingme:now');
-    }
-
-    private function writeEnvironment(string $key, string $value): void
-    {
-        $path = app()->environmentFilePath();
-        $contents = is_file($path) ? (string) file_get_contents($path) : '';
-        $line = $key.'="'.addcslashes($value, '"\\').'"';
-
-        if (preg_match('/^'.preg_quote($key, '/').'=.*/m', $contents)) {
-            $contents = (string) preg_replace('/^'.preg_quote($key, '/').'=.*/m', $line, $contents);
-        } else {
-            $contents = rtrim($contents).PHP_EOL.$line.PHP_EOL;
-        }
-
-        file_put_contents($path, $contents, LOCK_EX);
     }
 }

@@ -6,6 +6,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use MichalKortas\PingMeNow\Commands\EnrollCommand;
 use MichalKortas\PingMeNow\Commands\InstallCommand;
 use MichalKortas\PingMeNow\Commands\NowCommand;
 use MichalKortas\PingMeNow\Logging\LogSpool;
@@ -31,7 +32,7 @@ class PingMeNowServiceProvider extends ServiceProvider
         ], 'pingme-now-scripts');
 
         if ($this->app->runningInConsole()) {
-            $this->commands([InstallCommand::class, NowCommand::class]);
+            $this->commands([EnrollCommand::class, InstallCommand::class, NowCommand::class]);
         }
 
         Event::listen(MessageLogged::class, function (MessageLogged $event): void {

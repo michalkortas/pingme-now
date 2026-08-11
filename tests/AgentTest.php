@@ -1,6 +1,8 @@
 <?php
 
+use Illuminate\Http\Client\Request;
 use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use MichalKortas\PingMeNow\Logging\LogSpool;
 
@@ -60,4 +62,60 @@ it('redacts secrets in buffered logs', function () {
     expect($logs)->toHaveCount(1)
         ->and($logs[0]['context']['token'])->toBe('[REDACTED]')
         ->and($logs[0]['context']['safe'])->toBe('visible');
+});
+
+it('enrolls without exposing the integration token in command output', function () {
+    $statePath = storage_path('app/private/pingme-enrollment.json');
+    @unlink($statePath);
+    $environmentDirectory = sys_get_temp_dir().'/pingme-enroll-'.bin2hex(random_bytes(6));
+    mkdir($environmentDirectory);
+    file_put_contents($environmentDirectory.'/.env', "APP_NAME=Test\n");
+    app()->useEnvironmentPath($environmentDirectory);
+
+    Http::fake([
+        'https://hub.pingme.test/api/v1/enrollments' => Http::response(['status' => 'pending'], 201),
+    ]);
+
+    $pendingExitCode = Artisan::call('pingme:enroll', [
+        '--url' => 'https://hub.pingme.test',
+        '--name' => 'Test application',
+        '--environment' => 'production',
+    ]);
+    $pendingOutput = Artisan::output();
+
+    expect($pendingExitCode)->toBe(0)
+        ->and($pendingOutput)->toContain('Zgłoszenie wysłane');
+
+    $state = json_decode(file_get_contents($statePath), true, flags: JSON_THROW_ON_ERROR);
+    $token = 'pm_test_enrollment_token';
+    $encryptedToken = sodium_crypto_box_seal($token, base64_decode($state['public_key'], true));
+
+    Http::fake(function (Request $request) use ($encryptedToken) {
+        if ($request->method() === 'GET' && str_contains($request->url(), '/api/v1/enrollments/')) {
+            return Http::response(['status' => 'approved', 'encrypted_token' => base64_encode($encryptedToken)]);
+        }
+
+        if ($request->method() === 'POST' && str_ends_with($request->url(), '/complete')) {
+            return Http::response(['status' => 'completed']);
+        }
+
+        if (str_ends_with($request->url(), '/api/v1/ping')) {
+            return Http::response(['connected' => true, 'application' => ['name' => 'Test application']]);
+        }
+
+        return Http::response(['accepted' => true], 202);
+    });
+
+    $completedExitCode = Artisan::call('pingme:enroll', ['--resume' => true]);
+    $completedOutput = Artisan::output();
+
+    expect($completedExitCode)->toBe(0)
+        ->and($completedOutput)->toContain('Aplikacja została bezpiecznie połączona')
+        ->and($pendingOutput)->not->toContain($token)
+        ->and($completedOutput)->not->toContain($token)
+        ->and(file_get_contents($environmentDirectory.'/.env'))->toContain('PINGME_TOKEN="'.$token.'"')
+        ->and(is_file($statePath))->toBeFalse();
+
+    unlink($environmentDirectory.'/.env');
+    rmdir($environmentDirectory);
 });

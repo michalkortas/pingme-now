@@ -6,6 +6,28 @@ Paczka cyklicznie wysyła do huba stan aplikacji, kolejki, schedulera, bazy dany
 
 ## Instalacja
 
+### Bezpieczna rejestracja przez MCP
+
+Jeśli administrator zarządza Hubem przez MCP, agent może zgłosić aplikację bez kopiowania tokenu przez terminal lub rozmowę z agentem:
+
+```bash
+composer require michalkortas/pingme-now
+php artisan pingme:enroll \
+  --url=https://pingme.example.com \
+  --name="Nazwa aplikacji" \
+  --environment=production
+```
+
+Administrator zatwierdza oczekujące zgłoszenie narzędziem MCP `enrollments.approve`, wskazując grupę. Następnie na serwerze aplikacji uruchom:
+
+```bash
+php artisan pingme:enroll --resume
+```
+
+Agent generuje lokalną parę kluczy i zapisuje prywatny stan zgłoszenia z uprawnieniami `0600`. Hub szyfruje token kluczem publicznym agenta. Token jest odszyfrowywany bezpośrednio na serwerze aplikacji, zapisywany w `.env` i nie pojawia się w odpowiedzi MCP ani w komunikatach polecenia.
+
+### Rejestracja ręczna
+
 Najpierw utwórz aplikację w hubie PingMe i skopiuj wygenerowany dla niej token integracyjny.
 
 Zainstaluj paczkę:
