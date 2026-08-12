@@ -60,9 +60,9 @@ class NowCommand extends Command
                 $spool->restore($logs);
             }
 
-            $this->error('Nie udało się wysłać statusu: '.$exception->getMessage());
+            $this->warn('Nie udało się wysłać statusu: '.$exception->getMessage());
 
-            return self::FAILURE;
+            return self::SUCCESS;
         }
     }
 }

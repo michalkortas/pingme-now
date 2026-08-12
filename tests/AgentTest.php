@@ -50,6 +50,16 @@ it('sends the current status using pingme now', function () {
         && $request->hasHeader('Authorization', 'Bearer pm_test'));
 });
 
+it('does not fail the scheduler when the hub is unavailable', function () {
+    Http::fake([
+        'https://pingme.test/api/v1/ingest/*' => Http::response([], 503),
+    ]);
+
+    $this->artisan('pingme:now')
+        ->expectsOutputToContain('Nie udało się wysłać statusu')
+        ->assertSuccessful();
+});
+
 it('redacts secrets in buffered logs', function () {
     $spool = app(LogSpool::class);
     $spool->append(new MessageLogged('error', 'Failure', [
