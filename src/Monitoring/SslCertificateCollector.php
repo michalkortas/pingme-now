@@ -18,7 +18,7 @@ class SslCertificateCollector
         }
 
         $port = is_int($port) ? $port : 443;
-        $socketHost = str_contains($host, ':') ? "[{$host}]" : $host;
+        $socketHost = $this->resolveSocketHost($host);
 
         try {
             $context = stream_context_create(['ssl' => [
@@ -26,6 +26,8 @@ class SslCertificateCollector
                 'verify_peer' => true,
                 'verify_peer_name' => true,
                 'peer_name' => $host,
+                'SNI_enabled' => true,
+                'SNI_server_name' => $host,
             ]]);
             $client = @stream_socket_client(
                 "ssl://{$socketHost}:{$port}",
@@ -70,6 +72,17 @@ class SslCertificateCollector
         } catch (Throwable $exception) {
             return $this->failure($exception->getMessage());
         }
+    }
+
+    protected function resolveSocketHost(string $host): string
+    {
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return str_contains($host, ':') ? "[{$host}]" : $host;
+        }
+
+        $ipv4 = gethostbyname($host);
+
+        return filter_var($ipv4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? $ipv4 : $host;
     }
 
     private function failure(string $message): array

@@ -7,6 +7,20 @@ use Illuminate\Support\Facades\Http;
 use MichalKortas\PingMeNow\Logging\LogSpool;
 use MichalKortas\PingMeNow\Monitoring\SslCertificateCollector;
 
+it('uses a resolved IPv4 address for the TLS socket while retaining the domain for verification', function () {
+    $collector = new class extends SslCertificateCollector
+    {
+        public function socketHost(string $host): string
+        {
+            return $this->resolveSocketHost($host);
+        }
+    };
+
+    expect($collector->socketHost('localhost'))->toBe('127.0.0.1')
+        ->and($collector->socketHost('127.0.0.1'))->toBe('127.0.0.1')
+        ->and($collector->socketHost('::1'))->toBe('[::1]');
+});
+
 it('installs with URL and token passed in two explicit steps', function () {
     $environmentDirectory = sys_get_temp_dir().'/pingme-now-'.bin2hex(random_bytes(6));
     mkdir($environmentDirectory);
