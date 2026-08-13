@@ -98,6 +98,7 @@ php artisan schedule:work
 - heartbeat schedulera,
 - test kolejki oraz liczba nieudanych jobów z ostatnich 24 godzin,
 - całkowite i wolne miejsce na wskazanych dyskach,
+- certyfikat SSL sprawdzany z sieci aplikacji,
 - logi na poziomie `error` lub wyższym,
 - lokalny bufor logów na wypadek czasowej niedostępności huba,
 - pakiety z `composer.lock`,
@@ -122,6 +123,9 @@ PINGME_DISK_PATHS=/var/www/html/storage,/srv/backups
 PINGME_QUEUE_ENABLED=true
 PINGME_QUEUE_CONNECTION=redis
 PINGME_QUEUE=default
+
+# Adres sprawdzany lokalnie pod kątem SSL. Domyślnie APP_URL.
+PINGME_SSL_URL=https://app.example.com
 
 # Minimalny poziom przesyłanych logów.
 PINGME_LOG_LEVEL=error

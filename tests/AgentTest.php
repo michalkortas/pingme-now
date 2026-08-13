@@ -5,6 +5,7 @@ use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use MichalKortas\PingMeNow\Logging\LogSpool;
+use MichalKortas\PingMeNow\Monitoring\SslCertificateCollector;
 
 it('installs with URL and token passed in two explicit steps', function () {
     $environmentDirectory = sys_get_temp_dir().'/pingme-now-'.bin2hex(random_bytes(6));
@@ -47,7 +48,39 @@ it('sends the current status using pingme now', function () {
     $this->artisan('pingme:now')->assertSuccessful();
 
     Http::assertSent(fn ($request) => $request->url() === 'https://pingme.test/api/v1/ingest/snapshot'
-        && $request->hasHeader('Authorization', 'Bearer pm_test'));
+        && $request->hasHeader('Authorization', 'Bearer pm_test')
+        && ! $request->offsetExists('ssl')
+        && ! array_key_exists('ssl_days_remaining', $request['metrics']));
+});
+
+it('sends SSL validation performed from the application network', function () {
+    config()->set('pingme-now.ssl_url', 'https://internal.example.test');
+    $ssl = [
+        'source' => 'agent',
+        'days_remaining' => 99.5,
+        'valid_to' => now()->addDays(99)->toIso8601String(),
+        'issuer' => 'Test CA',
+        'error' => null,
+        'checked_at' => now()->toIso8601String(),
+    ];
+    $collector = Mockery::mock(SslCertificateCollector::class);
+    $collector->shouldReceive('collect')
+        ->once()
+        ->with('https://internal.example.test')
+        ->andReturn($ssl);
+    app()->instance(SslCertificateCollector::class, $collector);
+
+    Http::fake([
+        'https://pingme.test/api/v1/ingest/*' => Http::response(['accepted' => true], 202),
+    ]);
+
+    $this->artisan('pingme:now')->assertSuccessful();
+
+    Http::assertSent(function (Request $request) use ($ssl) {
+        return $request->url() === 'https://pingme.test/api/v1/ingest/snapshot'
+            && $request['metrics']['ssl_days_remaining'] === 99.5
+            && $request['ssl'] === $ssl;
+    });
 });
 
 it('does not fail the scheduler when the hub is unavailable', function () {

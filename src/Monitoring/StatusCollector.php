@@ -12,11 +12,14 @@ use Throwable;
 
 class StatusCollector
 {
+    public function __construct(private readonly SslCertificateCollector $sslCertificateCollector) {}
+
     public function collect(): array
     {
         $queueLastSeen = Cache::get('pingme-now:queue-canary-at');
         $disks = $this->disks();
         $checks = $this->checks();
+        $ssl = $this->sslCertificateCollector->collect(config('pingme-now.ssl_url'));
 
         $payload = [
             'event_uuid' => (string) Str::uuid(),
@@ -37,6 +40,11 @@ class StatusCollector
             'checks' => $checks,
             'disks' => $disks,
         ];
+
+        if ($ssl !== null) {
+            $payload['ssl'] = $ssl;
+            $payload['metrics']['ssl_days_remaining'] = $ssl['days_remaining'];
+        }
 
         if ((bool) config('pingme-now.queue.enabled')) {
             $job = new QueueCanary;
