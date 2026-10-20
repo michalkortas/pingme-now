@@ -33,7 +33,7 @@ class StatusCollector
             ],
             'metrics' => [
                 'scheduler_age_minutes' => 0,
-                'queue_age_minutes' => $queueLastSeen ? now()->diffInSeconds($queueLastSeen) / 60 : 999,
+                'queue_age_minutes' => $queueLastSeen ? now()->diffInSeconds($queueLastSeen, true) / 60 : 999,
                 'failed_jobs_24h' => $this->failedJobs(),
                 'disk_used_percent' => $disks === [] ? null : max(array_column($disks, 'used_percent')),
             ],
